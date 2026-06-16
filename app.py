@@ -26,7 +26,7 @@ if "rag_chain" not in st.session_state:
 if "processed_filename" not in st.session_state:
     st.session_state.processed_filename = ""
 
-# Sidebar Architecture View Implementation Elements
+# --- SIDEBAR ARCHITECTURE ---
 with st.sidebar:
     st.title("📌 Project Metadata")
     st.markdown("### Technology Stack")
@@ -46,75 +46,76 @@ with st.sidebar:
     else:
         st.info("🔴 Status: Waiting for PDF payload input processing tracks.")
 
-# Core Client Presentation UI Workspace Space Elements
+# --- MAIN UI WORKSPACE LAYOUT ---
 st.title("📖 PDF Chatbot using RAG")
 st.write("Extract insight arrays directly from technical multi-page PDF documents locally using isolated context semantic chains.")
 st.write("---")
 
-# Layout segmentation logic splits page into dynamic functional columns
-col1, col2 = st.columns([1, 2], gap="large")
+# SECTION 1: UPPER FILE UPLOAD REGION (Full Width)
+st.header("📂 1. Data Ingestion Layer")
+uploaded_file = st.file_uploader(
+    "Upload Source PDF Document Target",
+    type=["pdf"],
+    help="System bounds restrict processing limits to a maximum payload size of 20MB."
+)
 
-with col1:
-    st.header("📂 Data Ingestion Layer")
-    uploaded_file = st.file_uploader(
-        "Upload Source PDF Document Target",
-        type=["pdf"],
-        help="System bounds restrict processing limits to a maximum payload size of 20MB."
+if uploaded_file is not None:
+    # Enforce maximum size validation constraints before launching parsing actions
+    file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
+    
+    if file_size_mb > 20:
+        st.error("Payload rejection: File exceeds max operational capacity metrics of 20MB.")
+    else:
+        # Check if this file has already been ingested into session states
+        if st.session_state.processed_filename != uploaded_file.name:
+            with st.spinner("Extracting structural text from document pages..."):
+                raw_text = extract_text_from_pdf(uploaded_file)
+                
+            if raw_text:
+                with st.spinner("Executing recursive semantic chunk divisions..."):
+                    chunks = split_text_into_chunks(raw_text)
+                    
+                with st.spinner("Generating embeddings and mounting FAISS memory vectors..."):
+                    vector_store = create_vector_store(chunks)
+                    
+                if vector_store:
+                    chain = build_rag_chain(vector_store)
+                    if chain:
+                        st.session_state.vector_store = vector_store
+                        st.session_state.rag_chain = chain
+                        st.session_state.processed_filename = uploaded_file.name
+                        st.success(f"Successfully indexed: {uploaded_file.name}")
+                        st.rerun()
+
+st.write("---")
+
+# SECTION 2 & 3: LOWER SEARCH & ANSWER REGION (Full Width)
+st.header("💬 2. Contextual Search Sandbox")
+
+# Prompt block execution safety guard locks input elements until vectors assemble
+if st.session_state.rag_chain is None:
+    st.warning("Please upload and process a target document in the Data Ingestion panel above to activate the LLM querying loop.")
+else:
+    user_query = st.text_input(
+        "Ask a question about your PDF:",
+        placeholder="e.g., What is the main objective of this paper?",
+        key="query_input"
     )
     
-    if uploaded_file is not None:
-        # Enforce maximum size validation constraints before launching parsing actions
-        file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
-        
-        if file_size_mb > 20:
-            st.error("Payload rejection: File exceeds max operational capacity metrics of 20MB.")
+    if user_query:
+        if user_query.strip() == "":
+            st.error("Input rejection: Question string space cannot be submitted empty.")
         else:
-            # Check if this file has already been ingested into session states
-            if st.session_state.processed_filename != uploaded_file.name:
-                
-                with st.spinner("Extracting structural text from document pages..."):
-                    raw_text = extract_text_from_pdf(uploaded_file)
+            with st.spinner("Searching document index and parsing answer vectors..."):
+                try:
+                    # Direct interaction loop targeting the running LCEL pipeline
+                    response = st.session_state.rag_chain.invoke(user_query)
                     
-                if raw_text:
-                    with st.spinner("Executing recursive semantic chunk divisions..."):
-                        chunks = split_text_into_chunks(raw_text)
-                        
-                    with st.spinner("Generating embeddings and mounting FAISS memory vectors..."):
-                        vector_store = create_vector_store(chunks)
-                        
-                    if vector_store:
-                        chain = build_rag_chain(vector_store)
-                        if chain:
-                            st.session_state.vector_store = vector_store
-                            st.session_state.rag_chain = chain
-                            st.session_state.processed_filename = uploaded_file.name
-                            st.success("PDF processed successfully.")
-                            st.rerun()
-
-with col2:
-    st.header("💬 Contextual Search & Query Sandbox")
-    
-    # Prompt block execution safety guard locks input elements until vectors assemble
-    if st.session_state.rag_chain is None:
-        st.warning("Please upload and process a target document in the Data Ingestion panel to activate the LLM querying loop.")
-    else:
-        user_query = st.text_input(
-            "Ask a question about your PDF:",
-            placeholder="e.g., What is the main objective of this paper?",
-            key="query_input"
-        )
-        
-        if user_query:
-            if user_query.strip() == "":
-                st.error("Input rejection: Question string space cannot be submitted empty.")
-            else:
-                with st.spinner("Searching document index and parsing answer vectors..."):
-                    try:
-                        # Direct interaction loop targeting the running LCEL pipeline
-                        response = st.session_state.rag_chain.invoke(user_query)
-                        
-                        st.markdown("### 🤖 Answer Output Response")
-                        st.info(response)
-                        
-                    except Exception as e:
-                        st.error(f"Execution Error running target RAG orchestration sequence: {str(e)}")
+                    st.write("---")
+                    st.header("🤖 3. Answer Output Response")
+                    
+                    # Highlight responses using an info box container layout for better readability
+                    st.info(response)
+                    
+                except Exception as e:
+                    st.error(f"Execution Error running target RAG orchestration sequence: {str(e)}")
